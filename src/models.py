@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from abc import abstractmethod
 from .networks import Generator, Discriminator
-from .dataset import Places365Dataset, Cifar10Dataset
+from .dataset import Places365Dataset, Cifar10Dataset, HistoryBWDataset
 from .ops import pixelwise_accuracy, preprocess, postprocess
 from .ops import COLORSPACE_RGB, COLORSPACE_LAB
 from .utils import stitch_images, turing_test, imshow, visualize
@@ -123,8 +123,6 @@ class BaseModel:
         print('\n')
 
     def sample(self, show=True):
-        self.build()
-
         input_rgb = next(self.sample_generator)
         feed_dic = {self.input_rgb: input_rgb}
 
@@ -223,8 +221,8 @@ class BaseModel:
     def load(self):
         ckpt = tf.train.get_checkpoint_state(self.options.checkpoints_path)
         if ckpt is not None:
-            print('loading model...\n')
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+            print('loading model' + ' from ' + ckpt_name + '...\n')
             self.saver.restore(self.sess, os.path.join(self.options.checkpoints_path, ckpt_name))
             return True
 
@@ -350,3 +348,69 @@ class Places365Model(BaseModel):
             path=self.options.dataset_path,
             training=training,
             augment=self.options.augment)
+
+class HistoryBWModel(BaseModel):
+    def __init__(self, sess, options):
+        super(HistoryBWModel, self).__init__(sess, options)
+
+    def create_generator(self):
+        kernels_gen_encoder = [
+            (64, 1, 0),     # [batch, 256, 256, ch] => [batch, 256, 256, 64]
+            (64, 2, 0),     # [batch, 256, 256, 64] => [batch, 128, 128, 64]
+            (128, 2, 0),    # [batch, 128, 128, 64] => [batch, 64, 64, 128]
+            (256, 2, 0),    # [batch, 64, 64, 128] => [batch, 32, 32, 256]
+            (512, 2, 0),    # [batch, 32, 32, 256] => [batch, 16, 16, 512]
+            (512, 2, 0),    # [batch, 16, 16, 512] => [batch, 8, 8, 512]
+            (512, 2, 0),    # [batch, 8, 8, 512] => [batch, 4, 4, 512]
+            (512, 2, 0)     # [batch, 4, 4, 512] => [batch, 2, 2, 512]
+        ]
+
+        kernels_gen_decoder = [
+            (512, 2, 0.5),  # [batch, 2, 2, 512] => [batch, 4, 4, 512]
+            (512, 2, 0.5),  # [batch, 4, 4, 512] => [batch, 8, 8, 512]
+            (512, 2, 0.5),  # [batch, 8, 8, 512] => [batch, 16, 16, 512]
+            (256, 2, 0),    # [batch, 16, 16, 512] => [batch, 32, 32, 256]
+            (128, 2, 0),    # [batch, 32, 32, 256] => [batch, 64, 64, 128]
+            (64, 2, 0),     # [batch, 64, 64, 128] => [batch, 128, 128, 64]
+            (64, 2, 0)      # [batch, 128, 128, 64] => [batch, 256, 256, 64]
+        ]
+
+        return Generator('gen', kernels_gen_encoder, kernels_gen_decoder)
+
+    def create_discriminator(self):
+        kernels_dis = [
+            (64, 2, 0),     # [batch, 256, 256, ch] => [batch, 128, 128, 64]
+            (128, 2, 0),    # [batch, 128, 128, 64] => [batch, 64, 64, 128]
+            (256, 2, 0),    # [batch, 64, 64, 128] => [batch, 32, 32, 256]
+            (512, 2, 0),    # [batch, 32, 32, 256] => [batch, 16, 16, 512]
+            (512, 2, 0),    # [batch, 16, 16, 512] => [batch, 8, 8, 512]
+            (512, 2, 0),    # [batch, 8, 8, 512] => [batch, 4, 4, 512]
+            (512, 1, 0),    # [batch, 4, 4, 512] => [batch, 4, 4, 512]
+        ]
+
+        return Discriminator('dis', kernels_dis)
+
+    def create_dataset(self, training=True):
+        return HistoryBWDataset(
+            path=self.options.dataset_path,
+            training=training,
+            augment=self.options.augment)
+
+    def sample(self):
+        input_gray = next(self.sample_generator)
+        feed_dic = {self.input_rgb: input_gray}
+
+        step, rate = self.sess.run([self.global_step.assign_add(1), self.learning_rate])
+        fake_image = self.sess.run(self.sampler, feed_dict=feed_dic)
+        fake_image = postprocess(tf.convert_to_tensor(fake_image), colorspace_in=self.options.color_space,
+                                 colorspace_out=COLORSPACE_RGB)
+        img = stitch_images(input_gray, fake_image.eval())
+
+        # save img
+        if not os.path.exists(self.samples_dir):
+            os.makedirs(self.samples_dir)
+
+        sample = self.options.dataset + "_" + str(step).zfill(5) + ".png"
+
+        print('\nsaving sample ' + sample + ' - learning rate: ' + str(rate))
+        img.save(os.path.join(self.samples_dir, sample))

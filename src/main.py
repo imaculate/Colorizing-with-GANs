@@ -3,8 +3,8 @@ import random
 import numpy as np
 import tensorflow as tf
 from .options import ModelOptions
-from .models import Cifar10Model, Places365Model
-from .dataset import CIFAR10_DATASET, PLACES365_DATASET
+from .models import Cifar10Model, Places365Model, HistoryBWModel
+from .dataset import CIFAR10_DATASET, PLACES365_DATASET, HISTORYBW_DATASET
 
 
 def main(options):
@@ -27,6 +27,9 @@ def main(options):
 
         elif options.dataset == PLACES365_DATASET:
             model = Places365Model(sess, options)
+
+        elif options.dataset == HISTORYBW_DATASET:
+            model = HistoryBWModel(sess, options)
 
         if not os.path.exists(options.checkpoints_path):
             os.makedirs(options.checkpoints_path)
@@ -57,6 +60,10 @@ def main(options):
 
         elif options.mode == 1:
             model.evaluate()
+            while True:
+                model.sample()
+
+        elif options.mode == 2:
             while True:
                 model.sample()
 

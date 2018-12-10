@@ -26,6 +26,24 @@ def stitch_images(grayscale, original, pred):
 
     return img
 
+def stitch_images(grayscale, pred):
+    gap = 5
+    width, height = grayscale[0][:, :, 0].shape
+    img_per_row = 2 if width > 200 else 4
+    img = Image.new('RGB', (width * img_per_row * 2 + gap * (img_per_row - 1), height * int(len(grayscale) / img_per_row)))
+
+    grayscale = np.array(grayscale).squeeze()
+    pred = np.array(pred)
+
+    for ix in range(len(pred)):
+        xoffset = int(ix % img_per_row) * width * 2 + int(ix % img_per_row) * gap
+        yoffset = int(ix / img_per_row) * height
+        im1 = Image.fromarray(grayscale[ix])
+        im2 = Image.fromarray((pred[ix] * 255).astype(np.uint8))
+        img.paste(im1, (xoffset, yoffset))
+        img.paste(im2, (xoffset + width, yoffset))
+
+    return img
 
 def unpickle(file):
     with open(file, 'rb') as fo:

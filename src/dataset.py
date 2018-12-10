@@ -7,6 +7,7 @@ from .utils import unpickle
 
 CIFAR10_DATASET = 'cifar10'
 PLACES365_DATASET = 'places365'
+HISTORYBW_DATASET = 'historybw'
 
 
 class BaseDataset():
@@ -121,5 +122,19 @@ class Places365Dataset(BaseDataset):
 
         else:
             data = np.array(glob.glob(self.path + '/val_256/*.jpg'))
+
+        return data
+
+class HistoryBWDataset(BaseDataset):
+    def __init__(self, path, training=True, augment=True):
+        super(HistoryBWDataset, self).__init__(PLACES365_DATASET, path, training, augment)
+
+    def load(self):
+        if self.training:
+            data = np.array(
+                glob.glob(self.path + '/data_256/**/historic-black-and-white-photos*.jpg', recursive=True))
+
+        else:
+            data = np.array(glob.glob(self.path + '/val_256/historic-black-and-white-photos*.jpg'))
 
         return data
