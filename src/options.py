@@ -18,7 +18,7 @@ class ModelOptions:
         parser = argparse.ArgumentParser(description='Colorization with GANs')
         parser.add_argument('--seed', type=int, default=0, metavar='S', help='random seed (default: 0)')
         parser.add_argument('--name', type=str, default='CGAN', help='arbitrary model name (default: CGAN)')
-        parser.add_argument('--mode', default=0, help='run mode [0: train, 1: evaluate, 2: test] (default: 0)')
+        parser.add_argument('--mode', default=0, help='run mode [0: train, 1: evaluate, 2: test, 3: sample] (default: 0)')
         parser.add_argument('--dataset', type=str, default='places365', help='the name of dataset [places365, cifar10, historybw] (default: places365)')
         parser.add_argument('--dataset-path', type=str, default='./dataset', help='dataset path (default: ./dataset)')
         parser.add_argument('--checkpoints-path', type=str, default='./checkpoints', help='models are saved here (default: ./checkpoints)')
